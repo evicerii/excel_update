@@ -4,15 +4,18 @@ update vtl base
 import os
 import logging
 import datetime as dt
+import shutil
 import pandas as pd
 import xlwings as xw
 from utils.table import WorkDB, NewDB
+from utils.macros import copy_macros
 
 #перевод на кириллицу
 # sys.stdout.reconfigure(encoding='utf-8')
 log_name = dt.datetime.now().strftime("%d-%m-%y_%H-%M-%S")
 logging.basicConfig(filename=f'logs/{log_name}.log', level=logging.INFO, encoding='utf-8')
 logger = logging.getLogger(__name__)
+
 
 
 def update_table_main(work_base_name, base_sheet,
@@ -22,6 +25,11 @@ def update_table_main(work_base_name, base_sheet,
     '''
     try:
         logger.info('Started')
+        logger.info("Копирование фаила")
+        source_file = f'{work_base_name[:-5]}.xlsm'
+        destination_file = f'{work_base_name[:-5]}_bkp.xlsm'
+        shutil.copyfile(source_file, destination_file)
+        logger.info("Копирование успешно")
         #defining classes
         vtl = WorkDB(work_base_name, base_sheet, logger)
         contract_table = NewDB(update_base_name, new_sheet, logger)
@@ -93,7 +101,14 @@ def update_table_main(work_base_name, base_sheet,
         logger.info('end rewrite excel file %s', base_sheet)
         if select_contract_row_list_except:
             error_loading.to_excel('output.xls', index=False, engine='openpyxl')
+        logger.info('копирование макроса')
+        target_file = os.path.abspath(source_file)
+        export_file = os.path.abspath(destination_file)
+        copy_macros(export_file, target_file)
         logger.info('Finished')
         return f"Успешная загрузка, проблемные контракты {select_contract_row_list_except}"
     except FileNotFoundError as e:
         return f"Неверное имя фаила {str(e).split(sep=':', maxsplit=1)[-1]}"
+if __name__ == '__main__':
+    update_table_main('Абонентская База VTL плюс.xlsm', 'Список абонентов',
+                      'оплата.xlsx', '1')
